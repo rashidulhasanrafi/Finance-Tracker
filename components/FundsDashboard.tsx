@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, Modal, TextInput, ScrollView, Alert } from 'react-native';
 import { Goal, TRANSLATIONS, Language } from '../types';
-import { X, Target, Plus, Trash2, Coins, Trophy, Wallet, Pencil } from 'lucide-react';
+import { X, Target, Plus, Trash2, Coins, Trophy, Pencil } from 'lucide-react-native';
 import { playSound } from '../utils/sound';
 
 interface Props {
@@ -30,7 +31,6 @@ export const FundsDashboard: React.FC<Props> = ({
   currency,
   soundEnabled
 }) => {
-  // Goals State
   const [goalView, setGoalView] = useState<'list' | 'create' | 'edit' | 'deposit'>('list');
   const [newGoalName, setNewGoalName] = useState('');
   const [newGoalTarget, setNewGoalTarget] = useState('');
@@ -46,35 +46,7 @@ export const FundsDashboard: React.FC<Props> = ({
     if (soundEnabled) playSound('click');
   };
 
-  // Formatting helper
-  const formatNumber = (value: string) => {
-    const raw = value.replace(/[^0-9.]/g, '');
-    if (!raw) return '';
-    const parts = raw.split('.');
-    const integerPart = parts[0];
-    const decimalPart = parts.length > 1 ? '.' + parts[1].slice(0, 2) : '';
-    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    return formattedInteger + decimalPart;
-  };
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
-      const val = e.target.value;
-      if (/^[0-9,]*\.?[0-9]*$/.test(val)) {
-          setter(formatNumber(val));
-      }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat(language === 'bn' ? 'bn-BD' : 'en-US', {
-      style: 'currency',
-      currency: currency,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  // --- GOAL HANDLERS ---
-  const handleCreateGoal = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateGoal = () => {
     const target = parseFloat(newGoalTarget.replace(/,/g, ''));
     if (newGoalName && target > 0) {
       onAddGoal(newGoalName, target);
@@ -85,8 +57,7 @@ export const FundsDashboard: React.FC<Props> = ({
     }
   };
 
-  const handleUpdateGoal = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUpdateGoal = () => {
     const target = parseFloat(newGoalTarget.replace(/,/g, ''));
     if (selectedGoalId && newGoalName && target > 0) {
       onUpdateGoal(selectedGoalId, newGoalName, target);
@@ -98,10 +69,8 @@ export const FundsDashboard: React.FC<Props> = ({
     }
   };
 
-  const handleDepositGoal = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleDepositGoal = () => {
     const amount = parseFloat(depositAmount.replace(/,/g, ''));
-    
     if (selectedGoalId && amount > 0) {
       onAddFundsToGoal(selectedGoalId, amount, 'balance');
       setDepositAmount('');
@@ -115,7 +84,7 @@ export const FundsDashboard: React.FC<Props> = ({
     playClick();
     setSelectedGoalId(goal.id);
     setNewGoalName(goal.name);
-    setNewGoalTarget(formatNumber(goal.targetAmount.toString()));
+    setNewGoalTarget(goal.targetAmount.toString());
     setGoalView('edit');
   };
 
@@ -126,10 +95,13 @@ export const FundsDashboard: React.FC<Props> = ({
   };
 
   const deleteGoal = (id: string) => {
-    if (confirm(t.deleteGoalConfirm)) {
-      onDeleteGoal(id);
-      if (soundEnabled) playSound('delete');
-    }
+    Alert.alert("Confirm", t.deleteGoalConfirm, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", onPress: () => {
+            onDeleteGoal(id);
+            if(soundEnabled) playSound('delete');
+        }, style: "destructive"}
+    ]);
   };
 
   const getPercentage = (saved: number, target: number) => {
@@ -137,204 +109,179 @@ export const FundsDashboard: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-      
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md relative z-10 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 transition-colors overflow-hidden">
-        
-        {/* Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-white dark:bg-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-lg">
-              <Target size={22} />
-            </div>
-            <h3 className="text-xl font-bold text-slate-800 dark:text-white">{t.title}</h3>
-          </div>
-          <button onClick={() => { playClick(); onClose(); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="p-6 flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900/50">
+    <Modal visible={isOpen} transparent animationType="slide">
+      <View className="flex-1 justify-end bg-black/60">
+        <View className="bg-white dark:bg-slate-800 rounded-t-3xl h-[90%]">
           
-          {goalView === 'list' && (
-            <div className="space-y-4">
-              {goals.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-300 dark:text-slate-600">
-                    <Target size={32} />
-                  </div>
-                  <p className="text-slate-500 dark:text-slate-400">{t.emptyGoals}</p>
-                </div>
-              ) : (
-                goals.map(goal => {
-                  const percent = getPercentage(goal.savedAmount, goal.targetAmount);
-                  const isCompleted = percent >= 100;
-                  
-                  return (
-                    <div key={goal.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm relative overflow-hidden">
-                      {isCompleted && (
-                        <div className="absolute top-0 right-0 p-2 text-yellow-500 opacity-20 rotate-12">
-                            <Trophy size={64} />
-                        </div>
-                      )}
-                      
-                      <div className="flex justify-between items-start mb-2 relative z-10">
-                        <div>
-                          <h4 className="font-bold text-slate-800 dark:text-white text-lg">{goal.name}</h4>
-                          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
-                             {t.saved}: <span className="text-emerald-600 dark:text-emerald-400">{formatCurrency(goal.savedAmount)}</span> 
-                             <span className="mx-1">/</span> 
-                             {t.target}: {formatCurrency(goal.targetAmount)}
-                          </div>
-                        </div>
+          {/* Header */}
+          <View className="p-5 border-b border-slate-100 dark:border-slate-700 flex-row items-center justify-between">
+            <View className="flex-row items-center gap-3">
+              <View className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
+                <Target size={22} color="#2563eb" />
+              </View>
+              <Text className="text-xl font-bold text-slate-800 dark:text-white">{t.title}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} className="p-2">
+              <X size={20} color="#94a3b8" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView className="p-6">
+            
+            {goalView === 'list' && (
+              <View className="space-y-4">
+                {goals.length === 0 ? (
+                  <View className="items-center py-12">
+                    <View className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-full items-center justify-center mb-3">
+                      <Target size={32} color="#94a3b8" />
+                    </View>
+                    <Text className="text-slate-500 dark:text-slate-400">{t.emptyGoals}</Text>
+                  </View>
+                ) : (
+                  goals.map(goal => {
+                    const percent = getPercentage(goal.savedAmount, goal.targetAmount);
+                    const isCompleted = percent >= 100;
+                    
+                    return (
+                      <View key={goal.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 mb-4 shadow-sm">
                         
-                        <div className="flex gap-1">
-                            <button 
-                                onClick={() => openEditGoal(goal)}
-                                className="text-slate-400 hover:text-indigo-500 p-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                            >
-                                <Pencil size={16} />
-                            </button>
-                            <button 
-                                onClick={() => deleteGoal(goal.id)}
-                                className="text-slate-400 hover:text-rose-500 p-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
-                      </div>
+                        <View className="flex-row justify-between items-start mb-2">
+                          <View>
+                            <Text className="font-bold text-slate-800 dark:text-white text-lg">{goal.name}</Text>
+                            <Text className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
+                               {t.saved}: <Text className="text-emerald-600 dark:text-emerald-400">{goal.savedAmount}</Text> 
+                               / 
+                               {t.target}: {goal.targetAmount}
+                            </Text>
+                          </View>
+                          
+                          <View className="flex-row gap-1">
+                              <TouchableOpacity onPress={() => openEditGoal(goal)} className="p-2 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                                  <Pencil size={16} color="#94a3b8" />
+                              </TouchableOpacity>
+                              <TouchableOpacity onPress={() => deleteGoal(goal.id)} className="p-2 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                                  <Trash2 size={16} color="#ef4444" />
+                              </TouchableOpacity>
+                          </View>
+                        </View>
 
-                      {/* Progress Bar */}
-                      <div className="h-3 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-3 relative z-10">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-500 ${isCompleted ? 'bg-yellow-500' : 'bg-indigo-500'}`}
-                          style={{ width: `${percent}%` }}
-                        />
-                      </div>
-                      
-                      <div className="flex justify-between items-center relative z-10">
-                        <span className={`text-xs font-bold ${isCompleted ? 'text-yellow-600 dark:text-yellow-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                          {isCompleted ? 'Completed!' : `${percent}%`}
-                        </span>
+                        <View className="h-3 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-3">
+                          <View 
+                            className={`h-full rounded-full ${isCompleted ? 'bg-yellow-500' : 'bg-indigo-500'}`}
+                            style={{ width: `${percent}%` }}
+                          />
+                        </View>
                         
-                        <button
-                          onClick={() => openDepositGoal(goal.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
-                        >
-                          <Plus size={14} />
-                          {t.addMoney}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+                        <View className="flex-row justify-between items-center">
+                          <Text className={`text-xs font-bold ${isCompleted ? 'text-yellow-600 dark:text-yellow-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                            {isCompleted ? 'Completed!' : `${percent}%`}
+                          </Text>
+                          
+                          <TouchableOpacity
+                            onPress={() => openDepositGoal(goal.id)}
+                            className="flex-row items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg"
+                          >
+                            <Plus size={14} color="#4f46e5" />
+                            <Text className="text-indigo-700 dark:text-indigo-300 text-xs font-bold">{t.addMoney}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
 
-              <button
-                onClick={() => { playClick(); setGoalView('create'); }}
-                className="w-full py-3 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-medium hover:border-indigo-500 hover:text-indigo-500 dark:hover:border-indigo-400 dark:hover:text-indigo-400 transition-all flex items-center justify-center gap-2"
-              >
-                <Plus size={20} />
-                {t.addGoal}
-              </button>
-            </div>
-          )}
+                <TouchableOpacity
+                  onPress={() => { playClick(); setGoalView('create'); }}
+                  className="w-full py-3 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl items-center justify-center flex-row gap-2 mt-4"
+                >
+                  <Plus size={20} color="#64748b" />
+                  <Text className="text-slate-500 dark:text-slate-400 font-medium">{t.addGoal}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
-          {/* Create OR Edit Goal Form */}
-          {(goalView === 'create' || goalView === 'edit') && (
-            <form onSubmit={goalView === 'create' ? handleCreateGoal : handleUpdateGoal} className="space-y-4 animate-in slide-in-from-right-8 duration-200">
-              <h4 className="font-bold text-slate-800 dark:text-white text-lg text-center mb-2">
-                  {goalView === 'create' ? t.addGoal : t.editGoal}
-              </h4>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t.goalName}</label>
-                <input 
-                  type="text" 
+            {(goalView === 'create' || goalView === 'edit') && (
+              <View>
+                <Text className="font-bold text-slate-800 dark:text-white text-lg text-center mb-4">
+                    {goalView === 'create' ? t.addGoal : t.editGoal}
+                </Text>
+                
+                <Text className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t.goalName}</Text>
+                <TextInput 
                   value={newGoalName}
-                  onChange={(e) => setNewGoalName(e.target.value)}
+                  onChangeText={setNewGoalName}
                   placeholder="e.g. New Laptop"
-                  className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white"
-                  autoFocus
-                  required
+                  className="w-full p-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl mb-4 text-slate-800 dark:text-white"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t.target} ({currency})</label>
-                <input 
-                  type="text" 
-                  inputMode="decimal"
+
+                <Text className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t.target} ({currency})</Text>
+                <TextInput 
                   value={newGoalTarget}
-                  onChange={(e) => handleAmountChange(e, setNewGoalTarget)}
+                  onChangeText={setNewGoalTarget}
+                  keyboardType="numeric"
                   placeholder="0.00"
-                  className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white"
-                  required
+                  className="w-full p-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl mb-6 text-slate-800 dark:text-white"
                 />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { playClick(); setGoalView('list'); setSelectedGoalId(null); setNewGoalName(''); setNewGoalTarget(''); }}
-                  className="flex-1 py-3 text-slate-600 dark:text-slate-300 font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                >
-                  {tCommon.cancel}
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-3 text-white font-medium bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
-                >
-                  {goalView === 'create' ? t.create : t.update}
-                </button>
-              </div>
-            </form>
-          )}
 
-          {goalView === 'deposit' && (
-             <form onSubmit={handleDepositGoal} className="space-y-4 animate-in slide-in-from-right-8 duration-200">
-               <div className="text-center mb-4">
-                 <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-2 text-emerald-600 dark:text-emerald-400">
-                   <Coins size={24} />
-                 </div>
-                 <h4 className="font-bold text-slate-800 dark:text-white text-lg">{t.deposit}</h4>
-                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                   {goals.find(g => g.id === selectedGoalId)?.name}
-                 </p>
-               </div>
+                <View className="flex-row gap-3">
+                  <TouchableOpacity
+                    onPress={() => { playClick(); setGoalView('list'); setSelectedGoalId(null); setNewGoalName(''); setNewGoalTarget(''); }}
+                    className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 rounded-xl items-center"
+                  >
+                    <Text className="text-slate-600 dark:text-slate-300 font-medium">{tCommon.cancel}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={goalView === 'create' ? handleCreateGoal : handleUpdateGoal}
+                    className="flex-1 py-3 bg-indigo-600 rounded-xl items-center"
+                  >
+                    <Text className="text-white font-medium">{goalView === 'create' ? t.create : t.update}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
-               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t.addMoney} ({currency})</label>
-                <input 
-                  type="text" 
-                  inputMode="decimal"
+            {goalView === 'deposit' && (
+               <View>
+                 <View className="items-center mb-4">
+                   <View className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-full items-center justify-center mb-2">
+                     <Coins size={24} color="#059669" />
+                   </View>
+                   <Text className="font-bold text-slate-800 dark:text-white text-lg">{t.deposit}</Text>
+                   <Text className="text-sm text-slate-500 dark:text-slate-400">
+                     {goals.find(g => g.id === selectedGoalId)?.name}
+                   </Text>
+                 </View>
+
+                <Text className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t.addMoney} ({currency})</Text>
+                <TextInput 
                   value={depositAmount}
-                  onChange={(e) => handleAmountChange(e, setDepositAmount)}
+                  onChangeText={setDepositAmount}
+                  keyboardType="numeric"
                   placeholder="0.00"
-                  className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none dark:text-white text-lg font-semibold text-center"
+                  className="w-full p-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl mb-6 text-lg font-bold text-center text-slate-800 dark:text-white"
                   autoFocus
-                  required
                 />
-              </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { playClick(); setGoalView('list'); setSelectedGoalId(null); }}
-                  className="flex-1 py-3 text-slate-600 dark:text-slate-300 font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                >
-                  {tCommon.cancel}
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-3 text-white font-medium bg-emerald-600 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200 dark:shadow-none"
-                >
-                  {t.deposit}
-                </button>
-              </div>
-             </form>
-          )}
+                <View className="flex-row gap-3">
+                  <TouchableOpacity
+                    onPress={() => { playClick(); setGoalView('list'); setSelectedGoalId(null); }}
+                    className="flex-1 py-3 bg-slate-100 dark:bg-slate-700 rounded-xl items-center"
+                  >
+                    <Text className="text-slate-600 dark:text-slate-300 font-medium">{tCommon.cancel}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleDepositGoal}
+                    className="flex-1 py-3 bg-emerald-600 rounded-xl items-center"
+                  >
+                    <Text className="text-white font-medium">{t.deposit}</Text>
+                  </TouchableOpacity>
+                </View>
+               </View>
+            )}
 
-        </div>
-      </div>
-    </div>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 };

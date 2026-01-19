@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Copy, CheckCircle2, Calculator as CalculatorIcon } from 'lucide-react';
+import { View, Text, TouchableOpacity, Modal } from 'react-native';
+import { X, Copy, CheckCircle2, Calculator as CalculatorIcon } from 'lucide-react-native';
 import { TRANSLATIONS, Language } from '../types';
 import { playSound } from '../utils/sound';
 import { safeCopy } from '../utils/clipboard';
@@ -16,7 +17,6 @@ export const CalculatorModal: React.FC<Props> = ({ isOpen, onClose, language, so
   const [copied, setCopied] = useState(false);
   const t = TRANSLATIONS[language].calculator;
 
-  // Reset calculator when opening
   useEffect(() => {
     if (isOpen) {
       setDisplay('0');
@@ -44,34 +44,29 @@ export const CalculatorModal: React.FC<Props> = ({ isOpen, onClose, language, so
     const lastChar = display.slice(-1);
     const operators = ['+', '-', '*', '/', '.'];
     
-    // Prevent double operators
     if (operators.includes(lastChar)) {
         setDisplay(display.slice(0, -1) + op);
         return;
     }
     
-    // Don't start with operator unless it's minus (sometimes)
-    // For simplicity, just append if not error
     if (display !== t.error) {
        setDisplay(display + op);
     }
   };
 
   const calculate = () => {
-    if (soundEnabled) playSound('income'); // Success sound for result
+    if (soundEnabled) playSound('income');
     try {
-      // Safe evaluation using Function instead of direct eval
-      // Regex explicitly escapes hyphen to avoid range interpretation issues
       const sanitized = display.replace(/[^0-9+\-/*.]/g, '');
       if (!sanitized) return;
       
+      // Basic eval replacement
+      // eslint-disable-next-line no-new-func
       const result = new Function('return ' + sanitized)();
       
-      // Handle division by zero or invalid results
       if (!isFinite(result) || isNaN(result)) {
         setDisplay(t.error);
       } else {
-        // Limit decimals to prevent overflow
         const formatted = String(Math.round(result * 100) / 100);
         setDisplay(formatted);
       }
@@ -103,7 +98,6 @@ export const CalculatorModal: React.FC<Props> = ({ isOpen, onClose, language, so
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Buttons configuration
   const btns = [
     { label: 'C', action: handleClear, type: 'action' },
     { label: '÷', action: () => handleOperator('/'), type: 'op' },
@@ -126,62 +120,71 @@ export const CalculatorModal: React.FC<Props> = ({ isOpen, onClose, language, so
   ];
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-      
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm relative z-20 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-700">
-        
-        {/* Header */}
-        <div className="bg-slate-50 dark:bg-slate-800 p-4 flex items-center justify-between border-b border-slate-100 dark:border-slate-700">
-          <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold">
-            <CalculatorIcon size={20} />
-            <span>{t.title}</span>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors">
-            <X size={20} />
-          </button>
-        </div>
+    <Modal visible={isOpen} transparent animationType="slide">
+      <View className="flex-1 justify-end bg-black/60">
+        <View className="bg-white dark:bg-slate-800 rounded-t-3xl shadow-xl w-full border-t border-slate-200 dark:border-slate-700">
+          
+          {/* Header */}
+          <View className="bg-slate-50 dark:bg-slate-800 p-4 flex-row items-center justify-between border-b border-slate-100 dark:border-slate-700 rounded-t-3xl">
+            <View className="flex-row items-center gap-2">
+              <CalculatorIcon size={20} color="#4f46e5" />
+              <Text className="text-indigo-600 dark:text-indigo-400 font-bold">{t.title}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} className="p-2 rounded-full bg-slate-200 dark:bg-slate-700">
+              <X size={20} color="#64748b" />
+            </TouchableOpacity>
+          </View>
 
-        {/* Display */}
-        <div className="p-6 bg-slate-50 dark:bg-slate-900 text-right">
-           <div className="text-4xl font-bold text-slate-800 dark:text-white tracking-wider font-mono h-12 overflow-hidden truncate">
-             {display}
-           </div>
-        </div>
-
-        {/* Keypad */}
-        <div className="p-4 grid grid-cols-4 gap-3 bg-white dark:bg-slate-800">
-          {btns.map((btn, i) => (
-             <button
-               key={i}
-               onClick={btn.action}
-               className={`
-                 ${btn.colSpan === 2 ? 'col-span-2' : ''}
-                 ${btn.rowSpan === 2 ? 'row-span-2 h-full' : 'h-14'}
-                 rounded-xl font-bold text-lg transition-all active:scale-95 flex items-center justify-center shadow-sm
-                 ${btn.type === 'num' ? 'bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600' : ''}
-                 ${btn.type === 'op' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50' : ''}
-                 ${btn.type === 'action' ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50' : ''}
-                 ${btn.type === 'equal' ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200 dark:shadow-none' : ''}
-               `}
+          {/* Display */}
+          <View className="p-6 bg-slate-50 dark:bg-slate-900 items-end">
+             <Text 
+               className="text-4xl font-bold text-slate-800 dark:text-white font-mono"
+               numberOfLines={1}
+               adjustsFontSizeToFit
              >
-               {btn.label}
-             </button>
-          ))}
-        </div>
+               {display}
+             </Text>
+          </View>
 
-        {/* Copy Action */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
-          <button
-            onClick={handleCopy}
-            className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium flex items-center justify-center gap-2 transition-colors shadow-sm shadow-emerald-200 dark:shadow-none active:scale-95"
-          >
-            {copied ? <CheckCircle2 size={18} /> : <Copy size={18} />}
-            {copied ? t.copied : t.copy}
-          </button>
-        </div>
+          {/* Keypad */}
+          <View className="p-4 flex-row flex-wrap justify-between bg-white dark:bg-slate-800">
+            {btns.map((btn, i) => (
+               <TouchableOpacity
+                 key={i}
+                 onPress={btn.action}
+                 className={`
+                   ${btn.colSpan === 2 ? 'w-[48%]' : 'w-[23%]'}
+                   ${btn.rowSpan === 2 ? 'h-32' : 'h-14'}
+                   mb-2
+                   rounded-xl items-center justify-center shadow-sm
+                   ${btn.type === 'num' ? 'bg-slate-50 dark:bg-slate-700' : ''}
+                   ${btn.type === 'op' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}
+                   ${btn.type === 'action' ? 'bg-rose-50 dark:bg-rose-900/30' : ''}
+                   ${btn.type === 'equal' ? 'bg-indigo-600' : ''}
+                 `}
+               >
+                 <Text className={`text-lg font-bold 
+                   ${btn.type === 'equal' ? 'text-white' : 'text-slate-700 dark:text-slate-200'}
+                 `}>
+                   {btn.label}
+                 </Text>
+               </TouchableOpacity>
+            ))}
+          </View>
 
-      </div>
-    </div>
+          {/* Copy Action */}
+          <View className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 pb-8">
+            <TouchableOpacity
+              onPress={handleCopy}
+              className="w-full py-3 rounded-xl bg-emerald-600 items-center flex-row justify-center gap-2"
+            >
+              {copied ? <CheckCircle2 size={18} color="white" /> : <Copy size={18} color="white" />}
+              <Text className="text-white font-medium">{copied ? t.copied : t.copy}</Text>
+            </TouchableOpacity>
+          </View>
+
+        </View>
+      </View>
+    </Modal>
   );
 };

@@ -1,13 +1,11 @@
+import * as Clipboard from 'expo-clipboard';
+import { Alert } from 'react-native';
+
 export async function safeCopy(text: string) {
   try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      alert("Copied");
-    } else {
-      throw new Error("Clipboard not allowed");
-    }
+    await Clipboard.setStringAsync(text);
+    Alert.alert("Copied", "Text copied to clipboard");
   } catch (err) {
-    // Fallback for mobile / WebView
-    window.prompt("Copy this manually:", text);
+    console.error("Clipboard error", err);
   }
 }
